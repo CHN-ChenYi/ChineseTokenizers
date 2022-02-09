@@ -4,6 +4,7 @@ pub mod bpe;
 pub mod unigram;
 pub mod wordlevel;
 pub mod wordpiece;
+pub mod chinese_wordpiece;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -14,6 +15,7 @@ use crate::models::bpe::{BpeTrainer, BPE};
 use crate::models::unigram::{Unigram, UnigramTrainer};
 use crate::models::wordlevel::{WordLevel, WordLevelTrainer};
 use crate::models::wordpiece::{WordPiece, WordPieceTrainer};
+use crate::models::chinese_wordpiece::{ChineseWordPiece, ChineseWordPieceTrainer};
 use crate::{AddedToken, Model, Result, Token, Trainer};
 
 /// Wraps a vocab mapping (ID -> token) to a struct that will be serialized in order
@@ -44,6 +46,7 @@ pub enum ModelWrapper {
     BPE(BPE),
     // WordPiece must stay before WordLevel here for deserialization (for retrocompatibility
     // with the versions not including the "type"), since WordLevel is a subset of WordPiece
+    ChineseWordPiece(ChineseWordPiece),
     WordPiece(WordPiece),
     WordLevel(WordLevel),
     Unigram(Unigram),
@@ -51,6 +54,7 @@ pub enum ModelWrapper {
 
 impl_enum_from!(WordLevel, ModelWrapper, WordLevel);
 impl_enum_from!(WordPiece, ModelWrapper, WordPiece);
+impl_enum_from!(ChineseWordPiece, ModelWrapper, ChineseWordPiece);
 impl_enum_from!(BPE, ModelWrapper, BPE);
 impl_enum_from!(Unigram, ModelWrapper, Unigram);
 
@@ -62,6 +66,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.tokenize(tokens),
             WordPiece(t) => t.tokenize(tokens),
+            ChineseWordPiece(t) => t.tokenize(tokens),
             BPE(t) => t.tokenize(tokens),
             Unigram(t) => t.tokenize(tokens),
         }
@@ -72,6 +77,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.token_to_id(token),
             WordPiece(t) => t.token_to_id(token),
+            ChineseWordPiece(t) => t.token_to_id(token),
             BPE(t) => t.token_to_id(token),
             Unigram(t) => t.token_to_id(token),
         }
@@ -82,6 +88,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.id_to_token(id),
             WordPiece(t) => t.id_to_token(id),
+            ChineseWordPiece(t) => t.id_to_token(id),
             BPE(t) => t.id_to_token(id),
             Unigram(t) => t.id_to_token(id),
         }
@@ -92,6 +99,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.get_vocab(),
             WordPiece(t) => t.get_vocab(),
+            ChineseWordPiece(t) => t.get_vocab(),
             BPE(t) => t.get_vocab(),
             Unigram(t) => t.get_vocab(),
         }
@@ -102,6 +110,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.get_vocab_size(),
             WordPiece(t) => t.get_vocab_size(),
+            ChineseWordPiece(t) => t.get_vocab_size(),
             BPE(t) => t.get_vocab_size(),
             Unigram(t) => t.get_vocab_size(),
         }
@@ -112,6 +121,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.save(folder, name),
             WordPiece(t) => t.save(folder, name),
+            ChineseWordPiece(t) => t.save(folder, name),
             BPE(t) => t.save(folder, name),
             Unigram(t) => t.save(folder, name),
         }
@@ -122,6 +132,7 @@ impl Model for ModelWrapper {
         match self {
             WordLevel(t) => t.get_trainer().into(),
             WordPiece(t) => t.get_trainer().into(),
+            ChineseWordPiece(t) => t.get_trainer().into(),
             BPE(t) => t.get_trainer().into(),
             Unigram(t) => t.get_trainer().into(),
         }
@@ -130,6 +141,7 @@ impl Model for ModelWrapper {
 
 pub enum TrainerWrapper {
     BpeTrainer(BpeTrainer),
+    ChineseWordPieceTrainer(ChineseWordPieceTrainer),
     WordPieceTrainer(WordPieceTrainer),
     WordLevelTrainer(WordLevelTrainer),
     UnigramTrainer(UnigramTrainer),
@@ -141,6 +153,7 @@ impl Trainer for TrainerWrapper {
     fn should_show_progress(&self) -> bool {
         match self {
             TrainerWrapper::BpeTrainer(bpe) => bpe.should_show_progress(),
+            TrainerWrapper::ChineseWordPieceTrainer(wpt) => wpt.should_show_progress(),
             TrainerWrapper::WordPieceTrainer(wpt) => wpt.should_show_progress(),
             TrainerWrapper::WordLevelTrainer(wpt) => wpt.should_show_progress(),
             TrainerWrapper::UnigramTrainer(wpt) => wpt.should_show_progress(),
@@ -153,6 +166,10 @@ impl Trainer for TrainerWrapper {
                 ModelWrapper::BPE(bpe) => t.train(bpe),
                 _ => Err("BpeTrainer can only train a BPE".into()),
             },
+            TrainerWrapper::ChineseWordPieceTrainer(t) => match model {
+                ModelWrapper::ChineseWordPiece(wpt) => t.train(wpt),
+                _ => Err("ChineseWordPieceTrainer can only train a ChineseWordPiece".into()),
+            }
             TrainerWrapper::WordPieceTrainer(t) => match model {
                 ModelWrapper::WordPiece(wp) => t.train(wp),
                 _ => Err("WordPieceTrainer can only train a WordPiece".into()),
@@ -176,6 +193,7 @@ impl Trainer for TrainerWrapper {
     {
         match self {
             TrainerWrapper::BpeTrainer(bpe) => bpe.feed(iterator, process),
+            TrainerWrapper::ChineseWordPieceTrainer(wpt) => wpt.feed(iterator, process),
             TrainerWrapper::WordPieceTrainer(wpt) => wpt.feed(iterator, process),
             TrainerWrapper::WordLevelTrainer(wpt) => wpt.feed(iterator, process),
             TrainerWrapper::UnigramTrainer(wpt) => wpt.feed(iterator, process),
@@ -184,6 +202,7 @@ impl Trainer for TrainerWrapper {
 }
 
 impl_enum_from!(BpeTrainer, TrainerWrapper, BpeTrainer);
+impl_enum_from!(ChineseWordPieceTrainer, TrainerWrapper, ChineseWordPieceTrainer);
 impl_enum_from!(WordPieceTrainer, TrainerWrapper, WordPieceTrainer);
 impl_enum_from!(UnigramTrainer, TrainerWrapper, UnigramTrainer);
 impl_enum_from!(WordLevelTrainer, TrainerWrapper, WordLevelTrainer);

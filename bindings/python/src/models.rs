@@ -12,6 +12,7 @@ use tk::models::bpe::{BpeBuilder, Merges, Vocab, BPE};
 use tk::models::unigram::Unigram;
 use tk::models::wordlevel::WordLevel;
 use tk::models::wordpiece::{WordPiece, WordPieceBuilder};
+use tk::models::chinese_wordpiece::{ChineseWordPiece, ChineseWordPieceBuilder};
 use tk::models::ModelWrapper;
 use tk::{Model, Token};
 use tokenizers as tk;
@@ -38,6 +39,7 @@ impl PyModel {
         let py = gil.python();
         Ok(match *self.model.as_ref().read().unwrap() {
             ModelWrapper::BPE(_) => Py::new(py, (PyBPE {}, base))?.into_py(py),
+            ModelWrapper::ChineseWordPiece(_) => Py::new(py, (PyChineseWordPiece {}, base))?.into_py(py),
             ModelWrapper::WordPiece(_) => Py::new(py, (PyWordPiece {}, base))?.into_py(py),
             ModelWrapper::WordLevel(_) => Py::new(py, (PyWordLevel {}, base))?.into_py(py),
             ModelWrapper::Unigram(_) => Py::new(py, (PyUnigram {}, base))?.into_py(py),
@@ -488,6 +490,168 @@ impl PyBPE {
                 kwargs,
             )?,
         )
+    }
+}
+
+/// An implementation of the ChineseWordPiece algorithm
+///
+/// Args:
+///     vocab (:obj:`Dict[str, int]`, `optional`):
+///         A dictionnary of string keys and their ids :obj:`{"am": 0,...}`
+///
+///     unk_token (:obj:`str`, `optional`):
+///         The unknown token to be used by the model.
+///
+///     max_input_chars_per_word (:obj:`int`, `optional`):
+///         The maximum number of characters to authorize in a single word.
+#[pyclass(extends=PyModel, module = "tokenizers.models", name=ChineseWordPiece)]
+#[text_signature = "(self, vocab, unk_token, max_input_chars_per_word)"]
+pub struct PyChineseWordPiece {}
+
+impl PyChineseWordPiece {
+    fn with_builder(
+        mut builder: ChineseWordPieceBuilder,
+        kwargs: Option<&PyDict>,
+    ) -> PyResult<(Self, PyModel)> {
+        if let Some(kwargs) = kwargs {
+            for (key, val) in kwargs {
+                let key: &str = key.extract()?;
+                match key {
+                    "unk_token" => {
+                        builder = builder.unk_token(val.extract()?);
+                    }
+                    "max_input_chars_per_word" => {
+                        builder = builder.max_input_chars_per_word(val.extract()?);
+                    }
+                    "continuing_subword_prefix" => {
+                        builder = builder.continuing_subword_prefix(val.extract()?);
+                    }
+                    _ => println!("Ignored unknown kwargs option {}", key),
+                }
+            }
+        }
+
+        match builder.build() {
+            Err(e) => Err(exceptions::PyException::new_err(format!(
+                "Error while initializing ChineseWordPiece: {}",
+                e
+            ))),
+            Ok(ChineseWordPiece) => Ok((PyChineseWordPiece {}, ChineseWordPiece.into())),
+        }
+    }
+}
+
+#[pymethods]
+impl PyChineseWordPiece {
+    #[getter]
+    fn get_unk_token(self_: PyRef<Self>) -> String {
+        getter!(self_, ChineseWordPiece, unk_token.clone())
+    }
+
+    #[setter]
+    fn set_unk_token(self_: PyRef<Self>, unk_token: String) {
+        setter!(self_, ChineseWordPiece, unk_token, unk_token);
+    }
+
+    #[getter]
+    fn get_continuing_subword_prefix(self_: PyRef<Self>) -> String {
+        getter!(self_, ChineseWordPiece, continuing_subword_prefix.clone())
+    }
+
+    #[setter]
+    fn set_continuing_subword_prefix(self_: PyRef<Self>, continuing_subword_prefix: String) {
+        setter!(
+            self_,
+            ChineseWordPiece,
+            continuing_subword_prefix,
+            continuing_subword_prefix
+        );
+    }
+
+    #[getter]
+    fn get_max_input_chars_per_word(self_: PyRef<Self>) -> usize {
+        getter!(self_, ChineseWordPiece, max_input_chars_per_word)
+    }
+
+    #[setter]
+    fn set_max_input_chars_per_word(self_: PyRef<Self>, max: usize) {
+        setter!(self_, ChineseWordPiece, max_input_chars_per_word, max);
+    }
+
+    #[new]
+    #[args(kwargs = "**")]
+    fn new(vocab: Option<PyVocab>, kwargs: Option<&PyDict>) -> PyResult<(Self, PyModel)> {
+        let mut builder = ChineseWordPiece::builder();
+
+        if let Some(vocab) = vocab {
+            match vocab {
+                PyVocab::Vocab(vocab) => {
+                    builder = builder.vocab(vocab);
+                }
+                PyVocab::Filename(vocab_filename) => {
+                    deprecation_warning(
+                        "0.9.0",
+                        "ChineseWordPiece.__init__ will not create from files anymore, try `ChineseWordPiece.from_file` instead",
+                    )?;
+                    builder = builder.files(vocab_filename.to_string());
+                }
+            }
+        }
+
+        PyChineseWordPiece::with_builder(builder, kwargs)
+    }
+
+    /// Read a :obj:`vocab.txt` file
+    ///
+    /// This method provides a way to read and parse the content of a standard `vocab.txt`
+    /// file as used by the ChineseWordPiece Model, returning the relevant data structures. If you
+    /// want to instantiate some ChineseWordPiece models from memory, this method gives you the
+    /// expected input from the standard files.
+    ///
+    /// Args:
+    ///     vocab (:obj:`str`):
+    ///         The path to a :obj:`vocab.txt` file
+    ///
+    /// Returns:
+    ///     :obj:`Dict[str, int]`: The vocabulary as a :obj:`dict`
+    #[staticmethod]
+    #[text_signature = "(vocab)"]
+    fn read_file(vocab: &str) -> PyResult<Vocab> {
+        ChineseWordPiece::read_file(vocab).map_err(|e| {
+            exceptions::PyException::new_err(format!("Error while reading ChineseWordPiece file: {}", e))
+        })
+    }
+
+    /// Instantiate a ChineseWordPiece model from the given file
+    ///
+    /// This method is roughly equivalent to doing::
+    ///
+    ///     vocab = ChineseWordPiece.read_file(vocab_filename)
+    ///     ChineseWordPiece = ChineseWordPiece(vocab)
+    ///
+    /// If you don't need to keep the :obj:`vocab` values lying around, this method is
+    /// more optimized than manually calling :meth:`~tokenizers.models.ChineseWordPiece.read_file` to
+    /// initialize a :class:`~tokenizers.models.ChineseWordPiece`
+    ///
+    /// Args:
+    ///     vocab (:obj:`str`):
+    ///         The path to a :obj:`vocab.txt` file
+    ///
+    /// Returns:
+    ///     :class:`~tokenizers.models.ChineseWordPiece`: An instance of ChineseWordPiece loaded from file
+    #[classmethod]
+    #[args(kwargs = "**")]
+    #[text_signature = "(vocab, **kwargs)"]
+    fn from_file(
+        _cls: &PyType,
+        py: Python,
+        vocab: &str,
+        kwargs: Option<&PyDict>,
+    ) -> PyResult<Py<Self>> {
+        let vocab = ChineseWordPiece::read_file(vocab).map_err(|e| {
+            exceptions::PyException::new_err(format!("Error while reading ChineseWordPiece file: {}", e))
+        })?;
+        Py::new(py, PyChineseWordPiece::new(Some(PyVocab::Vocab(vocab)), kwargs)?)
     }
 }
 

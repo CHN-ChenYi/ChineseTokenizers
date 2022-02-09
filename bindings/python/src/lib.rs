@@ -57,6 +57,7 @@ fn trainers(_py: Python, m: &PyModule) -> PyResult<()> {
 fn models(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<models::PyModel>()?;
     m.add_class::<models::PyBPE>()?;
+    m.add_class::<models::PyChineseWordPiece>()?;
     m.add_class::<models::PyWordPiece>()?;
     m.add_class::<models::PyWordLevel>()?;
     m.add_class::<models::PyUnigram>()?;

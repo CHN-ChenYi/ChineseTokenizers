@@ -29,6 +29,9 @@ impl PyTrainer {
         let py = gil.python();
         Ok(match *self.trainer.as_ref().read().unwrap() {
             TrainerWrapper::BpeTrainer(_) => Py::new(py, (PyBpeTrainer {}, base))?.into_py(py),
+            TrainerWrapper::ChineseWordPieceTrainer(_) => {
+                Py::new(py, (PyChineseWordPieceTrainer {}, base))?.into_py(py)
+            }
             TrainerWrapper::WordPieceTrainer(_) => {
                 Py::new(py, (PyWordPieceTrainer {}, base))?.into_py(py)
             }
@@ -303,6 +306,211 @@ impl PyBpeTrainer {
             }
         }
         Ok((PyBpeTrainer {}, builder.build().into()))
+    }
+}
+
+/// Trainer capable of training a ChineseWordPiece model
+///
+/// Args:
+///     vocab_size (:obj:`int`, `optional`):
+///         The size of the final vocabulary, including all tokens and alphabet.
+///
+///     min_frequency (:obj:`int`, `optional`):
+///         The minimum frequency a pair should have in order to be merged.
+///
+///     show_progress (:obj:`bool`, `optional`):
+///         Whether to show progress bars while training.
+///
+///     special_tokens (:obj:`List[Union[str, AddedToken]]`, `optional`):
+///         A list of special tokens the model should know of.
+///
+///     limit_alphabet (:obj:`int`, `optional`):
+///         The maximum different characters to keep in the alphabet.
+///
+///     initial_alphabet (:obj:`List[str]`, `optional`):
+///         A list of characters to include in the initial alphabet, even
+///         if not seen in the training dataset.
+///         If the strings contain more than one character, only the first one
+///         is kept.
+///
+///     continuing_subword_prefix (:obj:`str`, `optional`):
+///         A prefix to be used for every subword that is not a beginning-of-word.
+///
+///     end_of_word_suffix (:obj:`str`, `optional`):
+///         A suffix to be used for every subword that is a end-of-word.
+#[pyclass(extends=PyTrainer, module = "tokenizers.trainers", name=ChineseWordPieceTrainer)]
+#[text_signature = "(self, vocab_size=30000, min_frequency=0, show_progress=True, special_tokens=[], limit_alphabet=None, initial_alphabet= [],continuing_subword_prefix=\"##\", end_of_word_suffix=None)"]
+pub struct PyChineseWordPieceTrainer {}
+#[pymethods]
+impl PyChineseWordPieceTrainer {
+    #[getter]
+    fn get_vocab_size(self_: PyRef<Self>) -> usize {
+        getter!(self_, ChineseWordPieceTrainer, vocab_size())
+    }
+
+    #[setter]
+    fn set_vocab_size(self_: PyRef<Self>, vocab_size: usize) {
+        setter!(self_, ChineseWordPieceTrainer, @set_vocab_size, vocab_size);
+    }
+
+    #[getter]
+    fn get_min_frequency(self_: PyRef<Self>) -> u32 {
+        getter!(self_, ChineseWordPieceTrainer, min_frequency())
+    }
+
+    #[setter]
+    fn set_min_frequency(self_: PyRef<Self>, freq: u32) {
+        setter!(self_, ChineseWordPieceTrainer, @set_min_frequency, freq);
+    }
+
+    #[getter]
+    fn get_show_progress(self_: PyRef<Self>) -> bool {
+        getter!(self_, ChineseWordPieceTrainer, show_progress())
+    }
+
+    #[setter]
+    fn set_show_progress(self_: PyRef<Self>, show_progress: bool) {
+        setter!(self_, ChineseWordPieceTrainer, @set_show_progress, show_progress);
+    }
+
+    #[getter]
+    fn get_special_tokens(self_: PyRef<Self>) -> Vec<PyAddedToken> {
+        getter!(
+            self_,
+            ChineseWordPieceTrainer,
+            special_tokens()
+                .iter()
+                .map(|tok| tok.clone().into())
+                .collect()
+        )
+    }
+
+    #[setter]
+    fn set_special_tokens(self_: PyRef<Self>, special_tokens: &PyList) -> PyResult<()> {
+        setter!(
+            self_,
+            ChineseWordPieceTrainer,
+            @set_special_tokens,
+            special_tokens
+                .into_iter()
+                .map(|token| {
+                    if let Ok(content) = token.extract::<String>() {
+                        Ok(tk::tokenizer::AddedToken::from(content, true))
+                    } else if let Ok(mut token) = token.extract::<PyRefMut<PyAddedToken>>() {
+                        token.is_special_token = true;
+                        Ok(token.get_token())
+                    } else {
+                        Err(exceptions::PyTypeError::new_err(
+                            "Special tokens must be a List[Union[str, AddedToken]]",
+                        ))
+                    }
+                })
+                .collect::<PyResult<Vec<_>>>()?
+        );
+        Ok(())
+    }
+
+    #[getter]
+    fn get_limit_alphabet(self_: PyRef<Self>) -> Option<usize> {
+        getter!(self_, ChineseWordPieceTrainer, limit_alphabet())
+    }
+
+    #[setter]
+    fn set_limit_alphabet(self_: PyRef<Self>, limit: Option<usize>) {
+        setter!(self_, ChineseWordPieceTrainer, @set_limit_alphabet, limit);
+    }
+
+    #[getter]
+    fn get_initial_alphabet(self_: PyRef<Self>) -> Vec<String> {
+        getter!(
+            self_,
+            ChineseWordPieceTrainer,
+            initial_alphabet().iter().map(|c| c.to_string()).collect()
+        )
+    }
+
+    #[setter]
+    fn set_initial_alphabet(self_: PyRef<Self>, alphabet: Vec<PyChar>) {
+        setter!(
+            self_,
+            ChineseWordPieceTrainer,
+            @set_initial_alphabet,
+            alphabet.into_iter().map(|c| c.0).collect()
+        );
+    }
+
+    #[getter]
+    fn get_continuing_subword_prefix(self_: PyRef<Self>) -> Option<String> {
+        getter!(self_, ChineseWordPieceTrainer, continuing_subword_prefix().clone())
+    }
+
+    #[setter]
+    fn set_continuing_subword_prefix(self_: PyRef<Self>, prefix: Option<String>) {
+        setter!(self_, ChineseWordPieceTrainer, @set_continuing_subword_prefix, prefix);
+    }
+
+    #[getter]
+    fn get_end_of_word_suffix(self_: PyRef<Self>) -> Option<String> {
+        getter!(self_, ChineseWordPieceTrainer, end_of_word_suffix().clone())
+    }
+
+    #[setter]
+    fn set_end_of_word_suffix(self_: PyRef<Self>, suffix: Option<String>) {
+        setter!(self_, ChineseWordPieceTrainer, @set_end_of_word_suffix, suffix);
+    }
+
+    #[new]
+    #[args(kwargs = "**")]
+    pub fn new(kwargs: Option<&PyDict>) -> PyResult<(Self, PyTrainer)> {
+        let mut builder = tk::models::chinese_wordpiece::ChineseWordPieceTrainer::builder();
+        if let Some(kwargs) = kwargs {
+            for (key, val) in kwargs {
+                let key: &str = key.extract()?;
+                match key {
+                    "vocab_size" => builder = builder.vocab_size(val.extract()?),
+                    "min_frequency" => builder = builder.min_frequency(val.extract()?),
+                    "show_progress" => builder = builder.show_progress(val.extract()?),
+                    "special_tokens" => {
+                        builder = builder.special_tokens(
+                            val.cast_as::<PyList>()?
+                                .into_iter()
+                                .map(|token| {
+                                    if let Ok(content) = token.extract::<String>() {
+                                        Ok(PyAddedToken::from(content, Some(true)).get_token())
+                                    } else if let Ok(mut token) =
+                                        token.extract::<PyRefMut<PyAddedToken>>()
+                                    {
+                                        token.is_special_token = true;
+                                        Ok(token.get_token())
+                                    } else {
+                                        Err(exceptions::PyTypeError::new_err(
+                                            "special_tokens must be a List[Union[str, AddedToken]]",
+                                        ))
+                                    }
+                                })
+                                .collect::<PyResult<Vec<_>>>()?,
+                        );
+                    }
+                    "limit_alphabet" => builder = builder.limit_alphabet(val.extract()?),
+                    "initial_alphabet" => {
+                        let alphabet: Vec<String> = val.extract()?;
+                        builder = builder.initial_alphabet(
+                            alphabet
+                                .into_iter()
+                                .filter_map(|s| s.chars().next())
+                                .collect(),
+                        );
+                    }
+                    "continuing_subword_prefix" => {
+                        builder = builder.continuing_subword_prefix(val.extract()?)
+                    }
+                    "end_of_word_suffix" => builder = builder.end_of_word_suffix(val.extract()?),
+                    _ => println!("Ignored unknown kwargs option {}", key),
+                };
+            }
+        }
+
+        Ok((PyChineseWordPieceTrainer {}, builder.build().into()))
     }
 }
 
