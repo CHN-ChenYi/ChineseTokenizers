@@ -9,7 +9,7 @@ from typing import Optional, List, Union, Dict, Iterator
 
 
 class BertWordPieceTokenizer(BaseTokenizer):
-    """ Bert WordPiece Tokenizer """
+    """Bert WordPiece Tokenizer"""
 
     def __init__(
         self,
@@ -102,7 +102,7 @@ class BertWordPieceTokenizer(BaseTokenizer):
         show_progress: bool = True,
         wordpieces_prefix: str = "##",
     ):
-        """ Train the model using the given files """
+        """Train the model using the given files"""
 
         trainer = trainers.WordPieceTrainer(
             vocab_size=vocab_size,
@@ -134,7 +134,7 @@ class BertWordPieceTokenizer(BaseTokenizer):
         show_progress: bool = True,
         wordpieces_prefix: str = "##",
     ):
-        """ Train the model using the given iterator """
+        """Train the model using the given iterator"""
 
         trainer = trainers.WordPieceTrainer(
             vocab_size=vocab_size,

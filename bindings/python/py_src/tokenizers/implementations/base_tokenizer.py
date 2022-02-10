@@ -96,7 +96,7 @@ class BaseTokenizer:
         )
 
     def no_padding(self):
-        """ Disable padding """
+        """Disable padding"""
         return self._tokenizer.no_padding()
 
     @property
@@ -128,7 +128,7 @@ class BaseTokenizer:
         return self._tokenizer.enable_truncation(max_length, stride=stride, strategy=strategy)
 
     def no_truncation(self):
-        """ Disable truncation """
+        """Disable truncation"""
         return self._tokenizer.no_truncation()
 
     @property

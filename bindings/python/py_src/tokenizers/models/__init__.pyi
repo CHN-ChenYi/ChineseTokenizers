@@ -211,6 +211,119 @@ class BPE(Model):
         """
         pass
 
+class ChineseWordPiece(Model):
+    """
+    An implementation of the ChineseWordPiece algorithm
+
+    Args:
+        vocab (:obj:`Dict[str, int]`, `optional`):
+            A dictionnary of string keys and their ids :obj:`{"am": 0,...}`
+
+        unk_token (:obj:`str`, `optional`):
+            The unknown token to be used by the model.
+
+        max_input_chars_per_word (:obj:`int`, `optional`):
+            The maximum number of characters to authorize in a single word.
+    """
+
+    def __init__(self, vocab, unk_token, max_input_chars_per_word):
+        pass
+    @staticmethod
+    def from_file(vocab, **kwargs):
+        """
+        Instantiate a ChineseWordPiece model from the given file
+
+        This method is roughly equivalent to doing::
+
+            vocab = ChineseWordPiece.read_file(vocab_filename)
+            ChineseWordPiece = ChineseWordPiece(vocab)
+
+        If you don't need to keep the :obj:`vocab` values lying around, this method is
+        more optimized than manually calling :meth:`~tokenizers.models.ChineseWordPiece.read_file` to
+        initialize a :class:`~tokenizers.models.ChineseWordPiece`
+
+        Args:
+            vocab (:obj:`str`):
+                The path to a :obj:`vocab.txt` file
+
+        Returns:
+            :class:`~tokenizers.models.ChineseWordPiece`: An instance of ChineseWordPiece loaded from file
+        """
+        pass
+    def id_to_token(self, id):
+        """
+        Get the token associated to an ID
+
+        Args:
+            id (:obj:`int`):
+                An ID to convert to a token
+
+        Returns:
+            :obj:`str`: The token associated to the ID
+        """
+        pass
+    @staticmethod
+    def read_file(vocab):
+        """
+        Read a :obj:`vocab.txt` file
+
+        This method provides a way to read and parse the content of a standard `vocab.txt`
+        file as used by the ChineseWordPiece Model, returning the relevant data structures. If you
+        want to instantiate some ChineseWordPiece models from memory, this method gives you the
+        expected input from the standard files.
+
+        Args:
+            vocab (:obj:`str`):
+                The path to a :obj:`vocab.txt` file
+
+        Returns:
+            :obj:`Dict[str, int]`: The vocabulary as a :obj:`dict`
+        """
+        pass
+    def save(self, folder, prefix):
+        """
+        Save the current model
+
+        Save the current model in the given folder, using the given prefix for the various
+        files that will get created.
+        Any file with the same name that already exists in this folder will be overwritten.
+
+        Args:
+            folder (:obj:`str`):
+                The path to the target folder in which to save the various files
+
+            prefix (:obj:`str`, `optional`):
+                An optional prefix, used to prefix each file name
+
+        Returns:
+            :obj:`List[str]`: The list of saved files
+        """
+        pass
+    def token_to_id(self, tokens):
+        """
+        Get the ID associated to a token
+
+        Args:
+            token (:obj:`str`):
+                A token to convert to an ID
+
+        Returns:
+            :obj:`int`: The ID associated to the token
+        """
+        pass
+    def tokenize(self, sequence):
+        """
+        Tokenize a sequence
+
+        Args:
+            sequence (:obj:`str`):
+                A sequence to tokenize
+
+        Returns:
+            A :obj:`List` of :class:`~tokenizers.Token`: The generated tokens
+        """
+        pass
+
 class Unigram(Model):
     """
     An implementation of the Unigram algorithm

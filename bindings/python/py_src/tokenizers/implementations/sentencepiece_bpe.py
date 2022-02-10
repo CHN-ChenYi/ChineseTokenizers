@@ -65,7 +65,7 @@ class SentencePieceBPETokenizer(BaseTokenizer):
         initial_alphabet: List[str] = [],
         show_progress: bool = True,
     ):
-        """ Train the model using the given files """
+        """Train the model using the given files"""
 
         trainer = trainers.BpeTrainer(
             vocab_size=vocab_size,
@@ -89,7 +89,7 @@ class SentencePieceBPETokenizer(BaseTokenizer):
         initial_alphabet: List[str] = [],
         show_progress: bool = True,
     ):
-        """ Train the model using the given iterator """
+        """Train the model using the given iterator"""
 
         trainer = trainers.BpeTrainer(
             vocab_size=vocab_size,

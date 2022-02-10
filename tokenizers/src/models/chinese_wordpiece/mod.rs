@@ -244,7 +244,7 @@ impl Model for ChineseWordPiece {
             chinese_chars_prefix_sum.push(chinese_chars_prefix_sum_);
         }
 
-        while start < chars_index.len() {
+        while start < chars_index.len() - 1 {
             let mut end = chars_index.len() - 1;
             let mut cur_str = None;
             let offset_start = chars_index[start];
