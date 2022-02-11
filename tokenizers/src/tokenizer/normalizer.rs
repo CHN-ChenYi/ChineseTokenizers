@@ -607,11 +607,14 @@ impl NormalizedString {
         lazy_static! {
             static ref JIEBA_ENTITY: jieba_rs::Jieba = jieba_rs::Jieba::new();
         }
-        let tokens = JIEBA_ENTITY.tokenize(&self.normalized, jieba_rs::TokenizeMode::Default, true);
+        let tokens = JIEBA_ENTITY.cut(&self.normalized, true);
+        let mut utf8_offset = 0;
         Ok(tokens
             .into_iter()
             .map(|token| {
-                self.slice(Range::Normalized(token.start..token.end))
+                let start_offset = utf8_offset;
+                utf8_offset += token.len();
+                self.slice(Range::Normalized(start_offset..utf8_offset))
                     .expect("NormalizedString bad split")
             })
             .collect())
