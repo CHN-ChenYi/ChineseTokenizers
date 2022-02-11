@@ -69,6 +69,7 @@ fn models(_py: Python, m: &PyModule) -> PyResult<()> {
 fn pre_tokenizers(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<pre_tokenizers::PyPreTokenizer>()?;
     m.add_class::<pre_tokenizers::PyByteLevel>()?;
+    m.add_class::<pre_tokenizers::PyJieba>()?;
     m.add_class::<pre_tokenizers::PyWhitespace>()?;
     m.add_class::<pre_tokenizers::PyWhitespaceSplit>()?;
     m.add_class::<pre_tokenizers::PySplit>()?;

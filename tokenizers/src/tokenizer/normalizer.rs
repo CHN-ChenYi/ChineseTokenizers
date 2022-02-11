@@ -1,5 +1,6 @@
 use crate::pattern::Pattern;
 use crate::{Offsets, Result};
+use jieba_rs;
 use std::ops::{Bound, RangeBounds};
 use unicode_normalization_alignments::UnicodeNormalization;
 
@@ -600,6 +601,20 @@ impl NormalizedString {
         let len = self.len();
         self.transform(std::iter::empty(), len);
         len
+    }
+
+    pub fn jieba_split(&self) -> Result<Vec<NormalizedString>> {
+        lazy_static! {
+            static ref JIEBA_ENTITY: jieba_rs::Jieba = jieba_rs::Jieba::new();
+        }
+        let tokens = JIEBA_ENTITY.tokenize(&self.normalized, jieba_rs::TokenizeMode::Default, true);
+        Ok(tokens
+            .into_iter()
+            .map(|token| {
+                self.slice(Range::Normalized(token.start..token.end))
+                    .expect("NormalizedString bad split")
+            })
+            .collect())
     }
 
     /// Split the current string in many subparts. Specify what to do with the

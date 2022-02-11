@@ -15,6 +15,7 @@ use tk::pre_tokenizers::metaspace::Metaspace;
 use tk::pre_tokenizers::punctuation::Punctuation;
 use tk::pre_tokenizers::split::Split;
 use tk::pre_tokenizers::unicode_scripts::UnicodeScripts;
+use tk::pre_tokenizers::jieba::Jieba;
 use tk::pre_tokenizers::whitespace::{Whitespace, WhitespaceSplit};
 use tk::pre_tokenizers::PreTokenizerWrapper;
 use tk::tokenizer::Offsets;
@@ -53,6 +54,9 @@ impl PyPreTokenizer {
                 match &*inner.as_ref().read().unwrap() {
                     PyPreTokenizerWrapper::Custom(_) => Py::new(py, base)?.into_py(py),
                     PyPreTokenizerWrapper::Wrapped(inner) => match inner {
+                        PreTokenizerWrapper::Jieba(_) => {
+                            Py::new(py, (PyJieba {}, base))?.into_py(py)
+                        }
                         PreTokenizerWrapper::Whitespace(_) => {
                             Py::new(py, (PyWhitespace {}, base))?.into_py(py)
                         }
@@ -269,6 +273,18 @@ impl PyByteLevel {
             .into_iter()
             .map(|c| c.to_string())
             .collect()
+    }
+}
+
+/// This pre-tokenizer splits using Jieba
+#[pyclass(extends=PyPreTokenizer, module = "tokenizers.pre_tokenizers", name=Jieba)]
+#[text_signature = "(self)"]
+pub struct PyJieba {}
+#[pymethods]
+impl PyJieba {
+    #[new]
+    fn new() -> (Self, PyPreTokenizer) {
+        (PyJieba {}, Jieba::default().into())
     }
 }
 

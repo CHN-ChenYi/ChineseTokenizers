@@ -2,6 +2,7 @@ pub mod bert;
 pub mod byte_level;
 pub mod delimiter;
 pub mod digits;
+pub mod jieba;
 pub mod metaspace;
 pub mod punctuation;
 pub mod sequence;
@@ -20,6 +21,7 @@ use crate::pre_tokenizers::punctuation::Punctuation;
 use crate::pre_tokenizers::sequence::Sequence;
 use crate::pre_tokenizers::split::Split;
 use crate::pre_tokenizers::unicode_scripts::UnicodeScripts;
+use crate::pre_tokenizers::jieba::Jieba;
 use crate::pre_tokenizers::whitespace::{Whitespace, WhitespaceSplit};
 use crate::{PreTokenizedString, PreTokenizer};
 
@@ -30,6 +32,7 @@ pub enum PreTokenizerWrapper {
     ByteLevel(ByteLevel),
     Delimiter(CharDelimiterSplit),
     Metaspace(Metaspace),
+    Jieba(Jieba),
     Whitespace(Whitespace),
     Sequence(Sequence),
     Split(Split),
@@ -46,6 +49,7 @@ impl PreTokenizer for PreTokenizerWrapper {
             PreTokenizerWrapper::ByteLevel(bpt) => bpt.pre_tokenize(normalized),
             PreTokenizerWrapper::Delimiter(dpt) => dpt.pre_tokenize(normalized),
             PreTokenizerWrapper::Metaspace(mspt) => mspt.pre_tokenize(normalized),
+            PreTokenizerWrapper::Jieba(jbpt) => jbpt.pre_tokenize(normalized),
             PreTokenizerWrapper::Whitespace(wspt) => wspt.pre_tokenize(normalized),
             PreTokenizerWrapper::Punctuation(tok) => tok.pre_tokenize(normalized),
             PreTokenizerWrapper::Sequence(tok) => tok.pre_tokenize(normalized),
@@ -60,6 +64,7 @@ impl PreTokenizer for PreTokenizerWrapper {
 impl_enum_from!(BertPreTokenizer, PreTokenizerWrapper, BertPreTokenizer);
 impl_enum_from!(ByteLevel, PreTokenizerWrapper, ByteLevel);
 impl_enum_from!(CharDelimiterSplit, PreTokenizerWrapper, Delimiter);
+impl_enum_from!(Jieba, PreTokenizerWrapper, Jieba);
 impl_enum_from!(Whitespace, PreTokenizerWrapper, Whitespace);
 impl_enum_from!(Punctuation, PreTokenizerWrapper, Punctuation);
 impl_enum_from!(Sequence, PreTokenizerWrapper, Sequence);
