@@ -68,3 +68,5 @@ http = ["reqwest", "cached-path"]
 criterion = "0.3"
 tempfile = "3.1"
 assert_approx_eq = "1.1"
+ndarray = "0.15.4"
+ndarray-npy = "0.8.1"

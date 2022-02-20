@@ -928,10 +928,19 @@ where
     where
         E: Into<EncodeInput<'s>> + Send,
     {
+        let bar = ProgressBar::new(inputs.len() as u64);
+        bar.set_style(
+            ProgressStyle::default_bar()
+                .template(
+                    "[{elapsed_precise}/{eta_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({per_sec})",
+                )
+                .progress_chars("#>-"),
+        );
         let mut encodings = inputs
             .into_maybe_par_iter()
-            .map(|input| self.encode(input, add_special_tokens))
+            .map(|input| {bar.inc(1); self.encode(input, add_special_tokens)})
             .collect::<Result<Vec<Encoding>>>()?;
+        bar.finish();
 
         if let Some(params) = &self.padding {
             // We do the padding here to make sure we handle the batch padding
