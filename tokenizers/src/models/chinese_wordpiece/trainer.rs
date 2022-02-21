@@ -164,13 +164,13 @@ impl ChineseWordPieceTrainer {
     pub fn train(&self, model: &mut ChineseWordPiece) -> Result<Vec<AddedToken>> {
         let mut bpe = BPE::default();
         let special_tokens = self.bpe_trainer.train(&mut bpe)?;
-        let new_ChineseWordPiece = ChineseWordPiece::from_bpe(&bpe);
+        let new_chinese_wordpiece = ChineseWordPiece::from_bpe(&bpe);
 
         // Transfer the vocab
-        model.vocab = new_ChineseWordPiece.vocab;
-        model.vocab_r = new_ChineseWordPiece.vocab_r;
+        model.vocab = new_chinese_wordpiece.vocab;
+        model.vocab_r = new_chinese_wordpiece.vocab_r;
         // The continuing_subword_prefix is the only other option to be overriden by the trainer
-        model.continuing_subword_prefix = new_ChineseWordPiece.continuing_subword_prefix;
+        model.continuing_subword_prefix = new_chinese_wordpiece.continuing_subword_prefix;
 
         Ok(special_tokens)
     }

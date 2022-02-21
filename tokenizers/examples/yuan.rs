@@ -6,9 +6,6 @@ use std::{
   time::Instant,
 };
 
-extern crate clap;
-use clap::{App, Arg};
-
 use tokenizers::models::chinese_wordpiece::ChineseWordPiece;
 use tokenizers::pre_tokenizers::jieba::Jieba;
 use tokenizers::{PaddingParams, PaddingStrategy, Tokenizer, TruncationParams};
@@ -57,7 +54,7 @@ fn main() {
   tokenizer.with_pre_tokenizer(Jieba::default());
   tokenizer.with_truncation(Some(TruncationParams {
     max_length: 2048,
-    ..Default::default()
+    ..TruncationParams::default()
   }));
   tokenizer.with_padding(Some(PaddingParams {
     strategy: PaddingStrategy::Fixed(2048),
@@ -67,8 +64,6 @@ fn main() {
   }));
 
   let output = tokenizer.encode_batch(data, true).unwrap();
-
-  let mut npz = NpzWriter::new(File::create(output_path).unwrap());
 
   let mut ids = Vec::new();
   let mut attention_masks = Vec::new();
@@ -85,9 +80,12 @@ fn main() {
   let np_ids = Array2::from_shape_vec((output.len(), 2048), ids).unwrap();
   let np_attention_masks = Array2::from_shape_vec((output.len(), 2048), attention_masks).unwrap();
 
-  npz.add_array("id", &np_ids);
-  npz.add_array("attention_mask", &np_attention_masks);
-  npz.finish();
+  let mut npz = NpzWriter::new(File::create(output_path).unwrap());
+  npz.add_array("id", &np_ids).expect("failed to pack id");
+  npz
+    .add_array("attention_mask", &np_attention_masks)
+    .expect("failed to pack attention_mask");
+  npz.finish().expect("failed to write npz");
 
   println!("Takes {} seconds in total", now.elapsed().as_secs());
   println!("Token number: {}", output.len() * 2048);
