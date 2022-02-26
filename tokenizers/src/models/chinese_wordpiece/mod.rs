@@ -3,6 +3,7 @@
 
 use crate::models::bpe::BPE;
 use crate::tokenizer::{Model, Result, Token};
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder, MatchKind};
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -16,6 +17,15 @@ use std::{
 mod serialization;
 mod trainer;
 pub use trainer::*;
+
+fn contain_chinese(s: &str) -> bool {
+    for c in s.chars() {
+        if ('\u{4e00}'..='\u{9fff}').contains(&c) {
+            return true;
+        }
+    }
+    false
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -107,9 +117,31 @@ impl ChineseWordPieceBuilder {
 
     /// Contructs a `ChineseWordPiece` model that uses the `ChineseWordPieceBuilder`'s configuration.
     pub fn build(mut self) -> Result<ChineseWordPiece> {
-        if let Some(vocab) = self.config.files {
+        if let Some(ref vocab) = self.config.files {
             self.config.vocab = ChineseWordPiece::read_file(&vocab)?;
         }
+
+        let trie = AhoCorasickBuilder::new()
+            .match_kind(MatchKind::LeftmostLongest)
+            .build(
+                self.config
+                    .vocab
+                    .iter()
+                    .map(|(key, _)| {
+                        if contain_chinese(key) {
+                            return key.clone();
+                        }
+                        if key.starts_with(&self.config.continuing_subword_prefix) {
+                            let mut new_key = key.clone();
+                            new_key
+                                .replace_range(..self.config.continuing_subword_prefix.len(), "");
+                            return new_key;
+                        }
+                        String::from("")
+                    })
+                    .filter(|key| key.len() > 0)
+                    .collect::<Vec<String>>(),
+            );
 
         let vocab_r = self
             .config
@@ -121,6 +153,7 @@ impl ChineseWordPieceBuilder {
         Ok(ChineseWordPiece {
             vocab: self.config.vocab,
             vocab_r,
+            trie,
             unk_token: self.config.unk_token,
             continuing_subword_prefix: self.config.continuing_subword_prefix,
             max_input_chars_per_word: self.config.max_input_chars_per_word,
@@ -131,13 +164,23 @@ impl ChineseWordPieceBuilder {
 /// A
 /// [ChineseWordPiece](https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/37842.pdf)
 /// model.
-#[derive(Clone, PartialEq)]
+#[derive(Clone)]
 pub struct ChineseWordPiece {
     vocab: Vocab,
     vocab_r: VocabR,
+    trie: AhoCorasick,
     pub unk_token: String,
     pub continuing_subword_prefix: String,
     pub max_input_chars_per_word: usize,
+}
+
+impl PartialEq for ChineseWordPiece {
+    fn eq(&self, other: &Self) -> bool {
+        self.vocab == other.vocab
+            && self.unk_token == other.unk_token
+            && self.continuing_subword_prefix == other.continuing_subword_prefix
+            && self.max_input_chars_per_word == other.max_input_chars_per_word
+    }
 }
 
 impl std::fmt::Debug for ChineseWordPiece {
@@ -156,6 +199,7 @@ impl Default for ChineseWordPiece {
         Self {
             vocab: HashMap::new(),
             vocab_r: HashMap::new(),
+            trie: AhoCorasick::new(&[""]),
             unk_token: String::from("[UNK]"),
             continuing_subword_prefix: String::from("##"),
             max_input_chars_per_word: 100,
@@ -225,75 +269,94 @@ impl Model for ChineseWordPiece {
             }]);
         }
 
-        let mut start = 0;
         let mut sub_tokens: Vec<Token> = vec![];
 
         let mut chars_index: Vec<usize> = vec![];
         let mut chars_index_ = 0usize;
-        let mut chinese_chars_prefix_sum: Vec<usize> = vec![];
-        let mut chinese_chars_prefix_sum_ = 0usize;
 
         chars_index.push(0);
-        chinese_chars_prefix_sum.push(0);
         for c in sequence.chars() {
             chars_index_ += c.len_utf8();
             chars_index.push(chars_index_);
-            if ('\u{4e00}'..='\u{9fff}').contains(&c) {
-                chinese_chars_prefix_sum_ += 1;
-            }
-            chinese_chars_prefix_sum.push(chinese_chars_prefix_sum_);
         }
 
-        while start < chars_index.len() - 1 {
-            let mut end = chars_index.len() - 1;
-            let mut cur_str = None;
-            let offset_start = chars_index[start];
+        // get first token
+        let offset_start = 0;
+        let mut end = chars_index.len() - 1;
+        while end > 0 {
+            let offset_end = chars_index[end];
+            let substr: Cow<str> = Cow::Borrowed(&sequence[offset_start..offset_end]);
+            if self.vocab.contains_key(substr.as_ref()) {
+                sub_tokens.push(Token {
+                    id: self.vocab[substr.as_ref()],
+                    value: substr.to_string(),
+                    offsets: (offset_start, offset_end),
+                });
+                break;
+            }
+            end -= 1;
+        }
+        if end == 0 {
+            sub_tokens.push(Token {
+                value: self.unk_token.clone(),
+                id: *self
+                    .vocab
+                    .get(&self.unk_token)
+                    .ok_or(Error::MissingUnkToken)?,
+                offsets: (0, chars_index[1]),
+            });
+            end += 1;
+        }
 
-            while start < end {
-                let offset_end = chars_index[end];
-                let mut substr: Cow<str> = Cow::Borrowed(&sequence[offset_start..offset_end]);
-
-                if chinese_chars_prefix_sum[end] - chinese_chars_prefix_sum[start] > 0 {
-                    if self.vocab.contains_key(substr.as_ref()) {
-                        cur_str = Some(Token {
-                            id: self.vocab[substr.as_ref()],
-                            value: substr.to_string(),
-                            offsets: (offset_start, offset_end),
+        // get other tokens
+        let mut last_id = end;
+        if last_id < chars_index.len() {
+            let offset = chars_index[last_id];
+            for mat in self.trie.find_iter(&sequence[offset..]) {
+                let mut last_offset = chars_index[last_id];
+                let offset_start = mat.start() + offset;
+                let offset_end = mat.end() + offset;
+                if offset_start != last_offset {
+                    while offset_start != last_offset {
+                        sub_tokens.push(Token {
+                            value: self.unk_token.clone(),
+                            id: *self
+                                .vocab
+                                .get(&self.unk_token)
+                                .ok_or(Error::MissingUnkToken)?,
+                            offsets: (last_offset, chars_index[last_id + 1]),
                         });
-                        break;
-                    }
-                } else {
-                    if start > 0 {
-                        substr =
-                            Cow::Owned(format!("{}{}", self.continuing_subword_prefix, substr));
-                    }
-                    if self.vocab.contains_key(substr.as_ref()) {
-                        cur_str = Some(Token {
-                            id: self.vocab[substr.as_ref()],
-                            value: substr.to_string(),
-                            offsets: (offset_start, offset_end),
-                        });
-                        break;
+                        last_id += 1;
+                        last_offset = chars_index[last_id];
                     }
                 }
-                end -= 1;
-            }
-
-            if cur_str.is_none() {
+                let mut substr: Cow<str> = Cow::Borrowed(&sequence[offset_start..offset_end]);
+                if !contain_chinese(substr.as_ref()) {
+                    substr = Cow::Owned(format!("{}{}", self.continuing_subword_prefix, substr));
+                }
                 sub_tokens.push(Token {
-                    value: self.unk_token.clone(),
-                    id: *self
-                        .vocab
-                        .get(&self.unk_token)
-                        .ok_or(Error::MissingUnkToken)?,
-                    offsets: (offset_start, chars_index[start + 1]),
+                    id: self.vocab[substr.as_ref()],
+                    value: substr.to_string(),
+                    offsets: (offset_start, offset_end),
                 });
-                start += 1;
-                continue;
+                while chars_index[last_id] != offset_end {
+                    last_id += 1;
+                }
             }
+        }
 
-            sub_tokens.push(cur_str.unwrap());
-            start = end;
+        // get remaining unk
+        last_id += 1;
+        while last_id < chars_index.len() {
+            sub_tokens.push(Token {
+                value: self.unk_token.clone(),
+                id: *self
+                    .vocab
+                    .get(&self.unk_token)
+                    .ok_or(Error::MissingUnkToken)?,
+                offsets: (chars_index[last_id - 1], chars_index[last_id]),
+            });
+            last_id += 1;
         }
 
         Ok(sub_tokens)
