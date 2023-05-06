@@ -27,8 +27,9 @@ fn main() {
   let now = Instant::now();
 
   let vocab_path = "./examples/vocab.txt";
-  let data_dir = "/shared/YuanDataset/raw";
-  let output_path = "/shared/YuanDataset/processed_data.npz";
+  //let data_dir = "/shared/YuanDataset/raw";
+	let data_dir = "/mnt/asc22/YuanDataset/raw/";
+  let output_path = "~/processed_data.npz";
   println!("vocab_path: {}", vocab_path);
   println!("data_dir: {}", data_dir);
   println!("output_path: {}", output_path);
@@ -50,7 +51,7 @@ fn main() {
   println!("Reading files takes {} seconds", now.elapsed().as_secs());
 
   let mut tokenizer =
-    Tokenizer::new(ChineseWordPiece::from_file(vocab_path).build().unwrap()).into_inner();
+    Tokenizer::new(ChineseWordPiece::from_file(vocab_path).unk_token(String::from("<unk>")).build().unwrap()).into_inner();
   tokenizer.with_pre_tokenizer(Jieba::default());
   tokenizer.with_truncation(Some(TruncationParams {
     max_length: 2048,
